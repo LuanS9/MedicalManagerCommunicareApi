@@ -2,7 +2,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,47 +23,30 @@ export class MedicalConsultationService {
   ) {}
 
   async emitConsultationRequest(patientId: string): Promise<void> {
-    this.rabbitClient.emit('queue.medical-consultation.requested', {
+    await this.rabbitClient.emit('queue.medical-consultation.requested', {
       patientId,
     });
   }
 
-  async hasOpenConsultation(doctorId: string): Promise<boolean> {
-    const openConsultation = await this.repository.findOne({
-      where: { doctorId, status: MedicalConsultationStatus.OPEN },
-    });
-
-    return !!openConsultation;
-  }
-
-  private async createConsultation(
+  async acceptConsultationRequest(
     patientId: string,
     doctorId: string,
   ): Promise<MedicalConsultation> {
+    const alreadyOpen = await this.repository.findOne({
+      where: { doctorId, status: MedicalConsultationStatus.OPEN },
+    });
+
+    if (alreadyOpen) {
+      throw new ConflictException('You already have an open consultation.');
+    }
+
     const consultation = this.repository.create({
       patientId,
       doctorId,
       status: MedicalConsultationStatus.OPEN,
     });
 
-    return await this.repository.save(consultation);
-  }
-
-  async handleConsultationDecision(
-    patientId: string,
-    doctorId: string,
-    accepted: boolean,
-  ): Promise<MedicalConsultation | string> {
-    const alreadyHasOpen = await this.hasOpenConsultation(doctorId);
-    if (alreadyHasOpen) {
-      throw new BadRequestException('Doctor already has an open consultation.');
-    }
-
-    if (accepted) {
-      return await this.createConsultation(patientId, doctorId);
-    }
-
-    return 'Consultation was declined and not registered.';
+    return this.repository.save(consultation);
   }
 
   async closeConsultation(
@@ -72,14 +55,15 @@ export class MedicalConsultationService {
   ): Promise<MedicalConsultation> {
     const consultation = await this.repository.findOneBy({ id, doctorId });
 
-    if (
-      !consultation ||
-      consultation.status === MedicalConsultationStatus.CLOSED
-    ) {
-      throw new NotFoundException('Consultation not found or already closed.');
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found.');
+    }
+
+    if (consultation.status === MedicalConsultationStatus.CLOSED) {
+      throw new ConflictException('Consultation already closed.');
     }
 
     consultation.status = MedicalConsultationStatus.CLOSED;
-    return await this.repository.save(consultation);
+    return this.repository.save(consultation);
   }
 }

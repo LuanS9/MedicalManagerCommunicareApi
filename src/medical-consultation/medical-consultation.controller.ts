@@ -19,17 +19,4 @@ export class MedicalConsultationController {
   ) {
     return this.consultationService.closeConsultation(id, doctorId);
   }
-
-  @Post('process-next')
-  processNextConsultation(
-    @Body('doctorId') doctorId: string,
-    @Body('patientId') patientId: string,
-    @Body('accepted') accepted: boolean,
-  ) {
-    return this.consultationService.handleConsultationDecision(
-      patientId,
-      doctorId,
-      accepted,
-    );
-  }
 }
