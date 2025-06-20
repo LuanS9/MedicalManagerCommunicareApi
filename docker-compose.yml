@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: medical_manager_consulting_db
+    ports:
+      - '3310:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - nestnet
+
+  api:
+    build: .
+    container_name: nest-api
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_HOST: mysql
+      DATABASE_PORT: 3306
+      DATABASE_USER: root
+      DATABASE_PASSWORD: password
+      DATABASE_NAME: medical_manager_consulting_db
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - nestnet
+    command: npm run start:dev
+    volumes:
+      - .:/usr/src/app
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - nestnet
+
+volumes:
+  mysql_data:
+
+networks:
+  nestnet:
