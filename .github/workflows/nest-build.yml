@@ -1,0 +1,35 @@
+name: Build NestJS API on Push
+
+on:
+  push:
+    branches:
+      - main
+      - homolog
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+
+    - name: Node.js environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install Node.js dependencies
+      run: npm ci
+
+    - name: API Build
+      run: npm run build
+      env:
+        NODE_ENV: production 
+
+    - name: API Tests
+      run: npm run test
+      continue-on-error: true
+    
